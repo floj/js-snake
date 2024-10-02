@@ -4,9 +4,9 @@ const animals = randomOrder(
 );
 
 const playerConfig = {
-  "player-1": { left: "ArrowLeft", right: "ArrowRight", emoji: animals.pop() }, // arrow keys
-  "player-2": { left: "a", right: "d", emoji: animals.pop() }, // wasd
-  "player-3": { left: "4", right: "6", emoji: animals.pop() }, // numpad left/right
+  "player-1": { left: "ArrowLeft", right: "ArrowRight" }, // arrow keys
+  "player-2": { left: "a", right: "d" }, // wasd
+  "player-3": { left: "4", right: "6" }, // numpad left/right
 };
 class Level {
   /**
@@ -49,7 +49,7 @@ class Snake {
   /** @type {Array<HTMLElement>} */
   cells = [];
   id;
-  score = 0;
+  emoji;
 
   /**
    * 0 = up
@@ -61,6 +61,8 @@ class Snake {
   position = 0;
   dead = false;
 
+  eaten = [];
+
   /**
    * @param {string} id
    * @param {Level} level
@@ -68,6 +70,7 @@ class Snake {
    */
   constructor(id, level) {
     this.id = id;
+    this.emoji = animals.pop();
     // initialize with random direction on random free cell
     this.direction = Math.floor(Math.random() * 4);
     const freeCells = level.cells.filter(
@@ -77,7 +80,7 @@ class Snake {
     const cell = randomElement(freeCells);
     this.position = parseInt(cell.dataset["cellnum"]);
     cell.classList.add("snake", id, "head");
-    cell.textContent = playerConfig[this.id].emoji;
+    cell.textContent = this.emoji;
     this.cells = [cell];
   }
 
@@ -135,19 +138,22 @@ class Snake {
 
     if (newCell.classList.contains("fruit")) {
       newCell.classList.remove("fruit");
+      const fruit = newCell.textContent;
+      this.eaten.push(fruit);
       newCell.textContent = "";
       this.cells.push(oldCell);
-      this.score++;
       level.addFruit();
       document.dispatchEvent(
-        new CustomEvent("snake:update-score", { detail: { player: this.id } })
+        new CustomEvent("snake:update-score", {
+          detail: { player: this, fruit },
+        })
       );
     }
 
     oldCell.classList.remove("head");
     oldCell.textContent = "";
     newCell.classList.add("snake", this.id, "head");
-    newCell.textContent = playerConfig[this.id].emoji;
+    newCell.textContent = this.emoji;
 
     // add the new cell to the snake, remove oldest cell from the snake
     this.cells.push(newCell);
@@ -181,7 +187,7 @@ class Game {
     snake = new Snake(id, this.level);
     this.snakes.push(snake);
     document.dispatchEvent(
-      new CustomEvent("snake:player-added", { detail: { player: id } })
+      new CustomEvent("snake:player-added", { detail: { player: snake } })
     );
     return snake;
   }
@@ -220,7 +226,23 @@ class Game {
   }
 }
 
-const level = new Level(20, 20, document.querySelector(".grid"));
+const queryParams = new URLSearchParams(window.location.search);
+function fromQuery(key, defaultValue, fn) {
+  let v = queryParams.get(key);
+  if (v === null) {
+    return defaultValue;
+  }
+  if (fn) {
+    v = fn(v);
+  }
+  return v;
+}
+
+const level = new Level(
+  fromQuery("width", 20, parseInt),
+  fromQuery("height", 20, parseInt),
+  document.querySelector(".grid")
+);
 
 const game = new Game(level);
 
@@ -230,18 +252,21 @@ document.addEventListener("snake:update-speed", () => {
 
 document.addEventListener("snake:update-score", (ev) => {
   const scoreElm = document.getElementById("score");
-  scoreElm.textContent = game.snakes
-    .map((s) => `${playerConfig[s.id].emoji} => ${s.score}`)
-    .join(" | ");
-  const id = ev.detail.player;
+  scoreElm.innerHTML = "";
+  for (const s of game.snakes) {
+    const d = document.createElement("div");
+    d.textContent = `${s.emoji} => ${s.eaten.join("")} (${s.eaten.length})`;
+    scoreElm.appendChild(d);
+  }
+  const { player, fruit } = ev.detail;
   const announceElm = document.getElementById("announcement");
-  announceElm.textContent = `${playerConfig[id].emoji} ate a fruit!`;
+  announceElm.textContent = `${player.emoji} ate a ${fruit}!`;
 });
 
 document.addEventListener("snake:player-won", () => {
   const elm = document.getElementById("announcement");
   const winner = game.snakes.find((s) => !s.dead);
-  elm.textContent = `${playerConfig[winner.id].emoji} won! 🏆🏆🏆`;
+  elm.textContent = `${winner.emoji} won! 🏆🏆🏆`;
 });
 
 document.addEventListener("snake:gameover", () => {
@@ -251,8 +276,8 @@ document.addEventListener("snake:gameover", () => {
 
 document.addEventListener("snake:player-added", (ev) => {
   const elm = document.getElementById("announcement");
-  const id = ev.detail.player;
-  elm.textContent = `Player ${playerConfig[id].emoji} entered the game`;
+  const { emoji } = ev.detail.player;
+  elm.textContent = `${emoji} entered the game`;
 });
 
 document.addEventListener("keydown", (evt) =>
@@ -298,4 +323,4 @@ window.onerror = () => {
 };
 
 // start game
-game.adjustSpeed(5);
+game.adjustSpeed(fromQuery("speed", 5, parseInt));
