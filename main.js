@@ -9,6 +9,7 @@ const cells = [];
 const snakeCells = [];
 
 const scoreElm = document.getElementById("score");
+const speedElm = document.getElementById("speed");
 
 // initialize the level
 const level = document.querySelector(".grid");
@@ -30,7 +31,20 @@ const directions = ["up", "right", "down", "left"];
 
 // randomly pick the start direction
 let direction = Math.floor(Math.random() * 4);
-let directionChanged = false;
+// initialize speed with 0, when the game is started, we'll set it to 4 initially
+let speed = 0;
+
+// handle of the running game loop
+let intervalId = null;
+
+const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
+
+function adjustSpeed(step) {
+  speed = clamp(speed + step, 1, 20);
+  clearInterval(intervalId);
+  intervalId = setInterval(gameTick, 1000 / speed);
+  speedElm.textContent = speed;
+}
 
 // randomly pick the start position
 let currentPosition = Math.floor(Math.random() * cells.length);
@@ -41,29 +55,23 @@ let currentPosition = Math.floor(Math.random() * cells.length);
 }
 
 document.addEventListener("keydown", (evt) => {
-  if (directionChanged) {
-    return;
-  }
   switch (evt.key) {
     case "ArrowLeft":
-      direction--;
-      break;
+      // normalize direction to [0,4]
+      direction = (direction + 4 - 1) % 4;
+      return;
     case "ArrowRight":
-      direction++;
-      break;
+      // normalize direction to [0,4]
+      direction = (direction + 4 + 1) % 4;
+      return;
+    case "+":
+      adjustSpeed(+1);
+      return;
+    case "-":
+      adjustSpeed(-1);
+      return;
   }
-  if (direction < 0) {
-    direction = 3;
-  }
-  if (direction > 3) {
-    direction = 0;
-  }
-
-  directionChanged = true;
-  console.log(direction, directions[direction]);
 });
-
-let intervalId = null;
 
 function addFruit() {
   const possibleCells = document.querySelectorAll(".grid > .cell:not(.snake)");
@@ -71,11 +79,8 @@ function addFruit() {
   possibleCells[fruitPos].classList.add("fruit");
 }
 
-addFruit();
-
 function gameTick() {
-  directionChanged = false;
-  let oldPosition = currentPosition;
+  const oldPosition = currentPosition;
   let newPosition = currentPosition;
 
   switch (direction) {
@@ -136,4 +141,8 @@ function gameTick() {
   currentPosition = newPosition;
 }
 
-intervalId = setInterval(gameTick, 1000 / 4);
+// add an initial fruit
+addFruit();
+
+// start game
+adjustSpeed(5);

@@ -28,3 +28,8 @@
 .gameover {
     background-color: red;
 }
+
+.controls {
+  padding: 0;
+  margin: 0;
+}
