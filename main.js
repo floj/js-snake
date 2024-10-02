@@ -231,16 +231,17 @@ document.addEventListener("snake:update-speed", () => {
 document.addEventListener("snake:update-score", (ev) => {
   const scoreElm = document.getElementById("score");
   scoreElm.textContent = game.snakes
-    .map((s) => `${s.id} => ${s.score}`)
+    .map((s) => `${playerConfig[s.id].emoji} => ${s.score}`)
     .join(" | ");
+  const id = ev.detail.player;
   const announceElm = document.getElementById("announcement");
-  announceElm.textContent = `Player ${ev.detail.player} ate a fruit!`;
+  announceElm.textContent = `${playerConfig[id].emoji} ate a fruit!`;
 });
 
 document.addEventListener("snake:player-won", () => {
   const elm = document.getElementById("announcement");
   const winner = game.snakes.find((s) => !s.dead);
-  elm.textContent = `🏆🏆🏆 Player ${winner.id} won! 🏆🏆🏆`;
+  elm.textContent = `${playerConfig[winner.id].emoji} won! 🏆🏆🏆`;
 });
 
 document.addEventListener("snake:gameover", () => {
@@ -250,7 +251,8 @@ document.addEventListener("snake:gameover", () => {
 
 document.addEventListener("snake:player-added", (ev) => {
   const elm = document.getElementById("announcement");
-  elm.textContent = `Player ${ev.detail.player} entered the game`;
+  const id = ev.detail.player;
+  elm.textContent = `Player ${playerConfig[id].emoji} entered the game`;
 });
 
 document.addEventListener("keydown", (evt) =>
