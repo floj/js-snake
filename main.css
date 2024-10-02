@@ -1,0 +1,30 @@
+.grid {
+  width: 400px;
+  height: 400px;
+  display: flex;
+  flex-wrap: wrap;
+  border: 1px solid black;
+}
+
+.cell {
+  border: 1px solid lightgrey;
+  width: 20px;
+  height: 20px;
+  box-sizing: border-box;
+}
+
+.snake {
+  background-color: brown;
+}
+
+.head {
+    background-color: darkmagenta;
+}
+
+.fruit {
+  background-color: lime;
+}
+
+.gameover {
+    background-color: red;
+}
