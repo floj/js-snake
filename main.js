@@ -1,148 +1,299 @@
-const levelWidth = 20;
-const levelHeight = 20;
-let score = 0;
+const fruits = Array.from("🍇🍈🍉🍊🍋🍋‍🟩🍌🍍🥭🍎🍏🍐🍑🍒🍓🫐🥝🍅🫒🥥🥑");
+const animals = randomOrder(
+  Array.from("🐵🐶🐺🦊🐱🦁🐯🐴🦄🐮🐷🐽🐭🐹🐰🐻🐨🐼🐸")
+);
 
-/** @type {Array<HTMLElement>} */
-const cells = [];
+const playerConfig = {
+  "player-1": { left: "ArrowLeft", right: "ArrowRight", emoji: animals.pop() }, // arrow keys
+  "player-2": { left: "a", right: "d", emoji: animals.pop() }, // wasd
+  "player-3": { left: "4", right: "6", emoji: animals.pop() }, // numpad left/right
+};
+class Level {
+  /**
+   *
+   * @param {Number} width
+   * @param {Number} height
+   * @param {HTMLElement} container
+   */
+  constructor(width, height, grid) {
+    this.width = width;
+    this.height = height;
 
-/** @type {Array<HTMLElement>} */
-const snakeCells = [];
+    for (let i = 0; i < width * height; i++) {
+      const cell = document.createElement("div");
+      cell.classList.add("cell");
+      cell.dataset["cellnum"] = i;
 
-const scoreElm = document.getElementById("score");
-const speedElm = document.getElementById("speed");
-
-// initialize the level
-const level = document.querySelector(".grid");
-for (let i = 0; i < levelWidth * levelHeight; i++) {
-  const cell = document.createElement("div");
-  cell.classList.add("cell");
-  cell.id = i;
-
-  level.appendChild(cell);
-  cells.push(cell);
-}
-
-const directions = ["up", "right", "down", "left"];
-// directions:
-// 0 = up
-// 1 = right
-// 2 = down
-// 3 = left
-
-// randomly pick the start direction
-let direction = Math.floor(Math.random() * 4);
-// initialize speed with 0, when the game is started, we'll set it to 4 initially
-let speed = 0;
-
-// handle of the running game loop
-let intervalId = null;
-
-const clamp = (v, min, max) => Math.min(Math.max(v, min), max);
-
-function adjustSpeed(step) {
-  speed = clamp(speed + step, 1, 20);
-  clearInterval(intervalId);
-  intervalId = setInterval(gameTick, 1000 / speed);
-  speedElm.textContent = speed;
-}
-
-// randomly pick the start position
-let currentPosition = Math.floor(Math.random() * cells.length);
-{
-  const initialCell = cells[currentPosition];
-  initialCell.classList.add("snake");
-  snakeCells.push(initialCell);
-}
-
-document.addEventListener("keydown", (evt) => {
-  switch (evt.key) {
-    case "ArrowLeft":
-      // normalize direction to [0,4]
-      direction = (direction + 4 - 1) % 4;
-      return;
-    case "ArrowRight":
-      // normalize direction to [0,4]
-      direction = (direction + 4 + 1) % 4;
-      return;
-    case "+":
-      adjustSpeed(+1);
-      return;
-    case "-":
-      adjustSpeed(-1);
-      return;
+      grid.appendChild(cell);
+      this.cells.push(cell);
+    }
   }
+  width = 0;
+  height = 0;
+  /** @type {Array<HTMLElement>} */
+  cells = [];
+  /** @type {HTMLElement} */
+
+  addFruit() {
+    const freeCells = this.cells.filter((c) => !c.classList.contains("snake"));
+    if (freeCells.length == 0) {
+      return;
+    }
+    const fruitCell = randomElement(freeCells);
+    fruitCell.classList.add("fruit");
+    fruitCell.textContent = randomElement(fruits);
+  }
+}
+
+class Snake {
+  /** @type {Array<HTMLElement>} */
+  cells = [];
+  id;
+  score = 0;
+
+  /**
+   * 0 = up
+   * 1 = right
+   * 2 = down
+   * 3 = left
+   */
+  direction = 0;
+  position = 0;
+  dead = false;
+
+  /**
+   * @param {string} id
+   * @param {Level} level
+   * @param {number} position
+   */
+  constructor(id, level) {
+    this.id = id;
+    // initialize with random direction on random free cell
+    this.direction = Math.floor(Math.random() * 4);
+    const freeCells = level.cells.filter(
+      (c) => !c.classList.contains("snake") && !c.classList.contains("fruit")
+    );
+
+    const cell = randomElement(freeCells);
+    this.position = parseInt(cell.dataset["cellnum"]);
+    cell.classList.add("snake", id, "head");
+    cell.textContent = playerConfig[this.id].emoji;
+    this.cells = [cell];
+  }
+
+  changeDirection(delta) {
+    this.direction = (this.direction + 4 + delta) % 4;
+  }
+
+  /**
+   * @param {Level} level
+   */
+  move(level) {
+    const oldPos = this.position;
+    let newPos = this.position;
+    switch (this.direction) {
+      case 0:
+        newPos = this.position - level.width;
+        // leave level on the top
+        if (newPos < 0) {
+          newPos = newPos + level.cells.length;
+        }
+        break;
+
+      case 1:
+        newPos = this.position + 1;
+        // leave level on the right
+        if (oldPos % level.width == level.width - 1) {
+          newPos = newPos - level.width;
+        }
+        break;
+
+      case 2:
+        newPos = this.position + level.width;
+        // leave level on the bottom
+        if (newPos >= level.cells.length) {
+          newPos = newPos - level.cells.length;
+        }
+        break;
+      case 3:
+        newPos = this.position - 1;
+        if (oldPos % level.width == 0) {
+          newPos = newPos + level.width;
+        }
+        break;
+    }
+    this.position = newPos;
+
+    const oldCell = level.cells[oldPos];
+    const newCell = level.cells[newPos];
+
+    // if cell is already taken, snake dies
+    if (newCell.classList.contains("snake")) {
+      this.dead = true;
+      return { oldPos, newPos };
+    }
+
+    if (newCell.classList.contains("fruit")) {
+      newCell.classList.remove("fruit");
+      newCell.textContent = "";
+      this.cells.push(oldCell);
+      this.score++;
+      level.addFruit();
+      document.dispatchEvent(
+        new CustomEvent("snake:update-score", { detail: { player: this.id } })
+      );
+    }
+
+    oldCell.classList.remove("head");
+    oldCell.textContent = "";
+    newCell.classList.add("snake", this.id, "head");
+    newCell.textContent = playerConfig[this.id].emoji;
+
+    // add the new cell to the snake, remove oldest cell from the snake
+    this.cells.push(newCell);
+    this.cells.shift().classList.remove("snake", this.id);
+
+    return { oldPos, newPos };
+  }
+}
+
+class Game {
+  level;
+  /** @type {Array<Snake>} */
+  snakes = [];
+  speed = 0;
+  intervalId = 0;
+
+  /**
+   * @param {Level} level
+   */
+  constructor(level) {
+    this.level = level;
+    level.addFruit();
+  }
+
+  getOrCreateSnake(id) {
+    let snake = this.snakes.find((s) => s.id === id);
+    if (snake) {
+      return snake;
+    }
+
+    snake = new Snake(id, this.level);
+    this.snakes.push(snake);
+    document.dispatchEvent(
+      new CustomEvent("snake:player-added", { detail: { player: id } })
+    );
+    return snake;
+  }
+
+  adjustSpeed(delta) {
+    this.speed = clamp(this.speed + delta, 1, 20);
+    this.stop();
+    this.intervalId = setInterval(() => this.tick(), 1000 / this.speed);
+    document.dispatchEvent(new Event("snake:update-speed"));
+  }
+
+  tick() {
+    /**@type {Array<Snake>} */
+    const snakes = randomOrder(this.snakes);
+
+    for (const snake of snakes) {
+      if (snake.dead) {
+        continue;
+      }
+      console.log("tick for", snake);
+
+      snake.move(this.level);
+      if (snakes.length > 1 && snakes.filter((s) => s.dead).length == 1) {
+        // player won
+        this.stop();
+        document.dispatchEvent(new Event("snake:player-won"));
+      }
+      if (snakes.length == 1 && snakes[0].dead) {
+        this.stop();
+        document.dispatchEvent(new Event("snake:gameover"));
+      }
+    }
+  }
+  stop() {
+    clearInterval(this.intervalId);
+  }
+}
+
+const level = new Level(20, 20, document.querySelector(".grid"));
+
+const game = new Game(level);
+
+document.addEventListener("snake:update-speed", () => {
+  document.getElementById("speed").textContent = game.speed;
 });
 
-function addFruit() {
-  const possibleCells = document.querySelectorAll(".grid > .cell:not(.snake)");
-  const fruitPos = Math.floor(Math.random() * possibleCells.length);
-  possibleCells[fruitPos].classList.add("fruit");
+document.addEventListener("snake:update-score", (ev) => {
+  const scoreElm = document.getElementById("score");
+  scoreElm.textContent = game.snakes
+    .map((s) => `${s.id} => ${s.score}`)
+    .join(" | ");
+  const announceElm = document.getElementById("announcement");
+  announceElm.textContent = `Player ${ev.detail.player} ate a fruit!`;
+});
+
+document.addEventListener("snake:player-won", () => {
+  const elm = document.getElementById("announcement");
+  const winner = game.snakes.find((s) => !s.dead);
+  elm.textContent = `🏆🏆🏆 Player ${winner.id} won! 🏆🏆🏆`;
+});
+
+document.addEventListener("snake:gameover", () => {
+  const elm = document.getElementById("announcement");
+  elm.textContent = `💀💀💀 Game Over! 💀💀💀`;
+});
+
+document.addEventListener("snake:player-added", (ev) => {
+  const elm = document.getElementById("announcement");
+  elm.textContent = `Player ${ev.detail.player} entered the game`;
+});
+
+document.addEventListener("keydown", (evt) =>
+  (keydownTable[evt.key] || (() => {}))()
+);
+
+//
+// some simple helper functions
+//
+function clamp(v, min, max) {
+  return Math.min(Math.max(v, min), max);
 }
 
-function gameTick() {
-  const oldPosition = currentPosition;
-  let newPosition = currentPosition;
-
-  switch (direction) {
-    case 0:
-      newPosition = currentPosition - levelWidth;
-      // leave level on the top
-      if (newPosition < 0) {
-        newPosition = newPosition + cells.length;
-      }
-      break;
-    case 1:
-      newPosition = currentPosition + 1;
-      // leave level on the right
-      if (oldPosition % levelWidth == levelWidth - 1) {
-        newPosition = newPosition - levelWidth;
-      }
-      break;
-    case 2:
-      newPosition = currentPosition + levelWidth;
-      // leave level on the bottom
-      if (newPosition >= cells.length) {
-        newPosition = newPosition - cells.length;
-      }
-      break;
-    case 3:
-      newPosition = currentPosition - 1;
-      if (oldPosition % levelWidth == 0) {
-        newPosition = newPosition + levelWidth;
-      }
-      break;
-  }
-
-  const newCell = cells[newPosition];
-  const oldCell = cells[oldPosition];
-
-  oldCell.classList.remove("head");
-  newCell.classList.add("head", "snake");
-
-  if (snakeCells.includes(newCell)) {
-    // game over
-    clearInterval(intervalId);
-    document.querySelector(".grid").classList.add("gameover");
-    return;
-  }
-
-  if (newCell.classList.contains("fruit")) {
-    newCell.classList.remove("fruit");
-    snakeCells.push(oldCell);
-    score++;
-    scoreElm.textContent = score;
-    addFruit();
-  }
-
-  // add the new cell to the snake, remove oldest cell from the snake
-  snakeCells.push(newCell);
-  snakeCells.shift().classList.remove("snake");
-
-  currentPosition = newPosition;
+function randomElement(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
 }
 
-// add an initial fruit
-addFruit();
+function randomOrder(arr) {
+  const shuffled = [...arr];
+  for (let i = shuffled.length - 1; i >= 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
+const keydownTable = Object.entries(playerConfig).reduce(
+  (acc, [id, conf]) => {
+    acc[conf.left] = () => game.getOrCreateSnake(id).changeDirection(-1);
+    acc[conf.right] = () => game.getOrCreateSnake(id).changeDirection(+1);
+    return acc;
+  },
+  {
+    "+": () => game.adjustSpeed(+1),
+    "-": () => game.adjustSpeed(-1),
+  }
+);
+
+// if an error occures, stop the game
+window.onerror = () => {
+  console.log("error occured");
+  game.stop();
+};
 
 // start game
-adjustSpeed(5);
+game.adjustSpeed(5);

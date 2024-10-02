@@ -14,19 +14,36 @@
 }
 
 .snake {
-  background-color: brown;
+  border-radius: 8px;
+}
+
+.player-1 {
+  background-color: hsl(241 100% 50%);
+}
+
+.player-3 {
+  background-color: hsl(14 100% 50);
+}
+
+.player-2 {
+  background-color: hsl(140 100% 50%);
 }
 
 .head {
-    background-color: darkmagenta;
+  border: 1px solid black;
+  background-color: transparent;
 }
 
 .fruit {
-  background-color: lime;
+  background-color: darkkhaki;
+}
+
+#announcement {
+  font-size: 2rem;
 }
 
 .gameover {
-    background-color: red;
+  background-color: red;
 }
 
 .controls {
